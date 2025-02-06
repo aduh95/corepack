@@ -192,7 +192,10 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
     } else {
       debugUtils.log(`Checking ${envFilePath}`);
       try {
-        localEnv = {...parseEnv(await fs.promises.readFile(envFilePath, `utf8`)), ...process.env};
+        localEnv = {
+          ...Object.fromEntries(Object.entries(parseEnv(await fs.promises.readFile(envFilePath, `utf8`))).filter(e => e[0].startsWith(`COREPACK_`))),
+          ...process.env,
+        };
         debugUtils.log(`Successfully loaded env file found at ${envFilePath}`);
       } catch (err) {
         if ((err as NodeError)?.code !== `ENOENT`)
