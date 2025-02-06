@@ -1,13 +1,16 @@
-import {UsageError}                            from 'clipanion';
-import fs                                      from 'fs';
-import path                                    from 'path';
-import semverValid                             from 'semver/functions/valid';
+import {UsageError}                      from 'clipanion';
+import fs                                from 'fs';
+import path                              from 'path';
+import semverSatisfies                   from 'semver/functions/satisfies';
+import semverValid                       from 'semver/functions/valid';
+import {parseEnv}                        from 'util';
 
-import {PreparedPackageManagerInfo}            from './Engine';
-import * as debugUtils                         from './debugUtils';
-import {NodeError}                             from './nodeUtils';
-import * as nodeUtils                          from './nodeUtils';
-import {Descriptor, isSupportedPackageManager} from './types';
+import type {PreparedPackageManagerInfo} from './Engine';
+import * as debugUtils                   from './debugUtils';
+import type {NodeError}                  from './nodeUtils';
+import * as nodeUtils                    from './nodeUtils';
+import {isSupportedPackageManager}       from './types';
+import type {LocalEnvFile, Descriptor}   from './types';
 
 const nodeModulesRegExp = /[\\/]node_modules[\\/](@[^\\/]*[\\/])?([^@\\/][^\\/]*)$/;
 
@@ -52,6 +55,43 @@ export function parseSpec(raw: unknown, source: string, {enforceExactVersion = t
   };
 }
 
+type CorepackPackageJSON = {
+  packageManager?: string;
+  devEngines?: { packageManager?: DevEngineDependency };
+};
+
+interface DevEngineDependency {
+  name: string;
+  version: string;
+}
+function parsePackageJSON(packageJSONContent: CorepackPackageJSON, localEnv?: LocalEnvFile) {
+  if (packageJSONContent.devEngines?.packageManager) {
+    const {packageManager} = packageJSONContent.devEngines;
+
+    if (Array.isArray(packageManager))
+      throw new UsageError(`Providing several package managers is currently not supported`);
+
+    let {version} = packageManager;
+    if (!version)
+      throw new UsageError(`Providing no version nor ranger for package manager is currently not supported`);
+
+    const localEnvKey = `COREPACK_DEV_ENGINES_${packageManager.name.toUpperCase()}`;
+    const localEnvVersion = localEnv?.[localEnvKey];
+    if (localEnvVersion) {
+      if (!semverSatisfies(localEnvVersion, version))
+        throw new UsageError(`Local env key ${localEnvKey} defines a value of ${localEnvVersion} which does not match the version defined in package.json devEngines.packageManager of ${version}`);
+
+      debugUtils.log(`Using ${localEnvVersion} defined in .corepack.env`);
+      version = localEnvVersion;
+    }
+
+
+    return `${packageManager.name}@${version}`;
+  }
+
+  return packageJSONContent.packageManager;
+}
+
 export async function setLocalPackageManager(cwd: string, info: PreparedPackageManagerInfo) {
   const lookup = await loadSpec(cwd);
 
@@ -84,6 +124,7 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
   let selection: {
     data: any;
     manifestPath: string;
+    localEnv?: LocalEnvFile;
   } | null = null;
 
   while (nextCwd !== currCwd && (!selection || !selection.data.packageManager)) {
@@ -111,13 +152,24 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
     if (typeof data !== `object` || data === null)
       throw new UsageError(`Invalid package.json in ${path.relative(initialCwd, manifestPath)}`);
 
-    selection = {data, manifestPath};
+    let localEnv: LocalEnvFile | undefined;
+    const envFilePath = path.join(currCwd, `.corepack.env`);
+    debugUtils.log(`Checking ${envFilePath}`);
+    try {
+      localEnv = parseEnv(await fs.promises.readFile(envFilePath, `utf8`)) as LocalEnvFile;
+    } catch (err) {
+      if ((err as NodeError)?.code !== `ENOENT`) {
+        throw err;
+      }
+    }
+
+    selection = {data, manifestPath, localEnv};
   }
 
   if (selection === null)
     return {type: `NoProject`, target: path.join(initialCwd, `package.json`)};
 
-  const rawPmSpec = selection.data.packageManager;
+  const rawPmSpec = parsePackageJSON(selection.data, selection.localEnv);
   if (typeof rawPmSpec === `undefined`)
     return {type: `NoSpec`, target: selection.manifestPath};
 
