@@ -329,10 +329,10 @@ it(`should use hash from env even when ".corepack.env" defines a different one`,
     });
     await xfs.writeFilePromise(ppath.join(cwd, `.corepack.env` as PortablePath), `COREPACK_DEV_ENGINES_YARN=3.0.0-rc.2+sha1.bedabb1e\n`);
 
-    process.env.COREPACK_DEV_ENGINES_YARN = `3.0.0-rc.2+sha224.deadbeef`;
+    process.env.COREPACK_DEV_ENGINES_YARN = `3.0.0-rc.2+sha1.deadbeef`;
     await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
       exitCode: 1,
-      stderr: expect.stringContaining(`Mismatch hashes. Expected bedabb1e, got 694bdad81703169e203febd57f9dc97d3be867bd`),
+      stderr: expect.stringContaining(`Mismatch hashes. Expected deadbeef, got 694bdad81703169e203febd57f9dc97d3be867bd`),
       stdout: ``,
     });
   });
