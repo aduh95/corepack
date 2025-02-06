@@ -124,16 +124,17 @@ export async function setLocalPackageManager(cwd: string, info: PreparedPackageM
     const lineEndIndex = content.indexOf(`\n`, index);
 
     previousPackageManager = content.slice(index, lineEndIndex === -1 ? undefined : lineEndIndex);
-    newContent = nodeUtils.normalizeLineEndings(content, `${content.slice(0, index)}\n${envKey}=${info.locator.reference}\n${lineEndIndex === -1 ? `` : content.slice(lineEndIndex)}`);
+    newContent = `${content.slice(0, index)}\n${envKey}=${info.locator.reference}\n${lineEndIndex === -1 ? `` : content.slice(lineEndIndex)}`;
   } else {
     const {data, indent} = nodeUtils.readPackageJson(content);
 
     previousPackageManager = data.packageManager ?? `unknown`;
     data.packageManager = `${info.locator.name}@${info.locator.reference}`;
 
-    newContent = nodeUtils.normalizeLineEndings(content, `${JSON.stringify(data, null, indent)}\n`);
+    newContent = `${JSON.stringify(data, null, indent)}\n`;
   }
 
+  newContent = nodeUtils.normalizeLineEndings(content, newContent);
   await fs.promises.writeFile((lookup as FoundSpecResult).envFilePath ?? lookup.target, newContent, `utf8`);
 
   return {
