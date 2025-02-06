@@ -294,6 +294,47 @@ it(`should use hash from "packageManager" even when "devEngines" defines a diffe
   });
 });
 
+it(`should use hash from env even when "devEngines" defines a different one`, async () => {
+  await xfs.mktempPromise(async cwd => {
+    await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+      devEngines: {
+        packageManager: {
+          name: `yarn`,
+          version: `3.0.0-rc.2+sha224.f83f6d1cbfac10ba6b516a62ccd2a72ccd857aa6c514d1cd7185ec60`,
+        },
+      },
+    });
+
+    process.env.COREPACK_DEV_ENGINES_YARN = `3.0.0-rc.2+sha224.deadbeef`;
+    await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
+      exitCode: 1,
+      stderr: /Mismatch hashes. Expected deadbeef, got f83f6d1cbfac10ba6b516a62ccd2a72ccd857aa6c514d1cd7185ec60/,
+      stdout: ``,
+    });
+  });
+});
+
+it(`should use hash from env even when ".corepack.env" defines a different one`, async () => {
+  await xfs.mktempPromise(async cwd => {
+    await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+      devEngines: {
+        packageManager: {
+          name: `yarn`,
+          version: `3.0.0-rc.2`,
+        },
+      },
+    });
+    await xfs.writeFilePromise(ppath.join(cwd, `.corepack.env` as PortablePath), `COREPACK_DEV_ENGINES_YARN=3.0.0-rc.2+sha1.bedabb1e\n`);
+
+    process.env.COREPACK_DEV_ENGINES_YARN = `3.0.0-rc.2+sha224.deadbeef`;
+    await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
+      exitCode: 1,
+      stderr: /Mismatch hashes. Expected bedabb1e, got 694bdad81703169e203febd57f9dc97d3be867bd/,
+      stdout: ``,
+    });
+  });
+});
+
 describe(`should accept range in devEngines only if a specific version is provided`, () => {
   it(`either in .corepack.env`, async() => {
     await xfs.mktempPromise(async cwd => {

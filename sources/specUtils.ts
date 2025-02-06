@@ -156,7 +156,7 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
     data: any;
     manifestPath: string;
     envFilePath?: string;
-    localEnv?: LocalEnvFile;
+    localEnv: LocalEnvFile;
   } | null = null;
 
   while (nextCwd !== currCwd && (!selection || !selection.data.packageManager)) {
@@ -184,15 +184,17 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
     if (typeof data !== `object` || data === null)
       throw new UsageError(`Invalid package.json in ${path.relative(initialCwd, manifestPath)}`);
 
-    let localEnv: LocalEnvFile | undefined;
-    const envFilePath = path.join(currCwd, `.corepack.env`);
+    let localEnv: LocalEnvFile;
+    const envFilePath = path.resolve(currCwd, `./.corepack.env`);
     debugUtils.log(`Checking ${envFilePath}`);
     try {
-      localEnv = {...process.env, ...parseEnv(await fs.promises.readFile(envFilePath, `utf8`))};
+      localEnv = {...parseEnv(await fs.promises.readFile(envFilePath, `utf8`)), ...process.env};
+      debugUtils.log(`Successfully loaded env file found at ${envFilePath}`);
     } catch (err) {
       if ((err as NodeError)?.code !== `ENOENT`)
         throw err;
 
+      debugUtils.log(`No env file found at ${envFilePath}`);
       localEnv = process.env;
     }
 
