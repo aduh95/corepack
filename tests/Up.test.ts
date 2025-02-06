@@ -34,7 +34,9 @@ describe(`UpCommand`, () => {
     });
   });
 
-  it(`should update the ".corepack.env" file from the current project`, async () => {
+  it(`should update the ".corepack.env" file from the current project`, async t => {
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
+    if (process.version.startsWith(`v18.`)) t.skip();
     await Promise.all([
       `COREPACK_DEV_ENGINES_YARN=2.1.0\n`,
       `\nCOREPACK_DEV_ENGINES_YARN=2.1.0\n`,
@@ -68,7 +70,10 @@ describe(`UpCommand`, () => {
     })));
   });
 
-  it(`should update the ".other.env" file from the current project when configured to use that`, async () => {
+  it(`should update the ".other.env" file from the current project when configured to use that`, async t => {
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
+    if (process.version.startsWith(`v18.`)) t.skip();
+
     await Promise.all([
       `COREPACK_DEV_ENGINES_YARN=2.1.0\n`,
       `\nCOREPACK_DEV_ENGINES_YARN=2.1.0\n`,

@@ -33,7 +33,10 @@ describe(`UseCommand`, () => {
     });
   });
 
-  it(`should update .corepack.env if present`, async () => {
+  it(`should update .corepack.env if present`, async t => {
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
+    if (process.version.startsWith(`v18.`)) t.skip();
+
     await Promise.all([
       `COREPACK_DEV_ENGINES_YARN=1.1.0\n`,
       `\nCOREPACK_DEV_ENGINES_YARN=1.1.0\n`,
@@ -66,7 +69,10 @@ describe(`UseCommand`, () => {
     })));
   });
 
-  it(`should update .other.env if present`, async () => {
+  it(`should update .other.env if present`, async t => {
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
+    if (process.version.startsWith(`v18.`)) t.skip();
+
     await Promise.all([
       `COREPACK_DEV_ENGINES_YARN=1.1.0\n`,
       `\nCOREPACK_DEV_ENGINES_YARN=1.1.0\n`,

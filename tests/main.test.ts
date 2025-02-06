@@ -315,7 +315,7 @@ it(`should use hash from env even when "devEngines" defines a different one`, as
 });
 
 it(`should use hash from env even when ".corepack.env" defines a different one`, async t => {
-  // Skip rest of the test on Node.js 18.x as it lacks support for .env files.
+  // Skip that test on Node.js 18.x as it lacks support for .env files.
   if (process.version.startsWith(`v18.`)) t.skip();
 
   await xfs.mktempPromise(async cwd => {
@@ -340,7 +340,7 @@ it(`should use hash from env even when ".corepack.env" defines a different one`,
 
 describe(`should accept range in devEngines only if a specific version is provided`, () => {
   it(`either in .corepack.env`, async t => {
-    // Skip rest of the test on Node.js 18.x as it lacks support for .env files.
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
     if (process.version.startsWith(`v18.`)) t.skip();
 
     await xfs.mktempPromise(async cwd => {
@@ -368,7 +368,7 @@ describe(`should accept range in devEngines only if a specific version is provid
     });
   });
   it(`either in a different env file specified in env`, async t => {
-    // Skip rest of the test on Node.js 18.x as it lacks support for .env files.
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
     if (process.version.startsWith(`v18.`)) t.skip();
 
     await xfs.mktempPromise(async cwd => {
@@ -455,7 +455,7 @@ describe(`should accept range in devEngines only if a specific version is provid
 });
 
 it(`Should use version from correct source`, async t => {
-  // Skip rest of the test on Node.js 18.x as it lacks support for .env files.
+  // Skip that test on Node.js 18.x as it lacks support for .env files.
   if (process.version.startsWith(`v18.`)) t.skip();
 
   await xfs.mktempPromise(async cwd => {
@@ -497,7 +497,7 @@ it(`Should use version from correct source`, async t => {
 
 describe(`should reject if range in devEngines does not match version provided`,  () => {
   it(`in .corepack.env`, async t => {
-    // Skip rest of the test on Node.js 18.x as it lacks support for .env files.
+    // Skip that test on Node.js 18.x as it lacks support for .env files.
     if (process.version.startsWith(`v18.`)) t.skip();
 
     await xfs.mktempPromise(async cwd => {
