@@ -300,6 +300,10 @@ same major line. Should you need to upgrade to a new major, use an explicit
   instruct Corepack to skip integrity checks, or to a JSON string containing
   custom keys.
 
+- `COREPACK_DEV_ENGINE_${UPPER_CASE_PACKAGE_MANAGER_NAME}` can be set to give
+  Corepack a specific version matching the range defined in `package.json`'s
+  `devEngines.packageManager` field.
+
 ## Troubleshooting
 
 The environment variable `DEBUG` can be set to `corepack` to enable additional debug logging.

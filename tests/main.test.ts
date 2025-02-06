@@ -16,16 +16,49 @@ beforeEach(async () => {
   process.env.COREPACK_DEFAULT_TO_LATEST = `0`;
 });
 
-it(`should refuse to download a package manager if the hash doesn't match`, async () => {
-  await xfs.mktempPromise(async cwd => {
-    await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as Filename), {
-      packageManager: `yarn@1.22.4+sha1.deadbeef`,
-    });
+describe(`should refuse to download a package manager if the hash doesn't match`, () => {
+  it(`the one defined in "devEngines.packageManager" field`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as Filename), {
+        devEngines: {
+          packageManager: {name: `yarn`, version: `1.22.4+sha1.deadbeef`},
+        },
+      });
 
-    await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
-      exitCode: 1,
-      stderr: /Mismatch hashes/,
-      stdout: ``,
+      await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: /Mismatch hashes/,
+        stdout: ``,
+      });
+    });
+  });
+  it(`the one defined in env variable`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as Filename), {
+        devEngines: {
+          packageManager: {name: `yarn`, version: `1.x`},
+        },
+      });
+
+      process.env.COREPACK_DEV_ENGINES_YARN = `1.22.4+sha1.deadbeef`;
+      await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: /Mismatch hashes/,
+        stdout: ``,
+      });
+    });
+  });
+  it(`the one defined in "packageManager" field`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as Filename), {
+        packageManager: `yarn@1.22.4+sha1.deadbeef`,
+      });
+
+      await expect(runCli(cwd, [`yarn`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: /Mismatch hashes/,
+        stdout: ``,
+      });
     });
   });
 });
@@ -241,14 +274,14 @@ it(`should ignore the packageManager field when found within a node_modules vend
   });
 });
 
-it(`should prefer devEngines to packageManager`, async () => {
+it(`should use hash from "packageManager" even when "devEngines" defines a different one`, async () => {
   await xfs.mktempPromise(async cwd => {
     await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
-      packageManager: `yarn@1.22.4`,
+      packageManager: `yarn@3.0.0-rc.2+sha224.f83f6d1cbfac10ba6b516a62ccd2a72ccd857aa6c514d1cd7185ec60`,
       devEngines: {
         packageManager: {
           name: `yarn`,
-          version: `3.0.0-rc.2+sha224.f83f6d1cbfac10ba6b516a62ccd2a72ccd857aa6c514d1cd7185ec60`,
+          version: `3.0.0-rc.2+sha224.deadbeef`,
         },
       },
     });
@@ -287,7 +320,7 @@ describe(`should accept range in devEngines only if a specific version is provid
       });
     });
   });
-  it(`either in env`, async() => {
+  it(`either in an env variable`, async() => {
     await xfs.mktempPromise(async cwd => {
       await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
         devEngines: {
@@ -311,7 +344,7 @@ describe(`should accept range in devEngines only if a specific version is provid
       });
     });
   });
-  it(`either in package.json#packageManager`, async() => {
+  it(`either in package.json#packageManager field`, async() => {
     await xfs.mktempPromise(async cwd => {
       await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
         devEngines: {
@@ -345,22 +378,62 @@ describe(`should accept range in devEngines only if a specific version is provid
   });
 });
 
-it(`should reject if range in devEngines does not match version provided in .corepack.env`, async () => {
-  await xfs.mktempPromise(async cwd => {
-    await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
-      devEngines: {
-        packageManager: {
-          name: `pnpm`,
-          version: `10.x`,
+describe(`should reject if range in devEngines does not match version provided`,  () => {
+  it(`in .corepack.env`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+        devEngines: {
+          packageManager: {
+            name: `pnpm`,
+            version: `10.x`,
+          },
         },
-      },
+      });
+      await xfs.writeFilePromise(ppath.join(cwd, `.corepack.env` as PortablePath),
+        `COREPACK_DEV_ENGINES_PNPM=6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073\n`);
+      await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: `Local env key COREPACK_DEV_ENGINES_PNPM defines a value of 6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073 which does not match the version defined in package.json devEngines.packageManager of 10.x\n`,
+        stdout: ``,
+      });
     });
-    await xfs.writeFilePromise(ppath.join(cwd, `.corepack.env` as PortablePath),
-      `COREPACK_DEV_ENGINES_PNPM=6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073\n`);
-    await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
-      exitCode: 1,
-      stderr: `Local env key COREPACK_DEV_ENGINES_PNPM defines a value of 6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073 which does not match the version defined in package.json devEngines.packageManager of 10.x\n`,
-      stdout: ``,
+  });
+
+  it(`in an env variable`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+        devEngines: {
+          packageManager: {
+            name: `pnpm`,
+            version: `10.x`,
+          },
+        },
+      });
+      process.env.COREPACK_DEV_ENGINES_PNPM = `6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073`;
+      await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: `Local env key COREPACK_DEV_ENGINES_PNPM defines a value of 6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073 which does not match the version defined in package.json devEngines.packageManager of 10.x\n`,
+        stdout: ``,
+      });
+    });
+  });
+
+  it(`in package.json#packageManager field`, async () => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+        devEngines: {
+          packageManager: {
+            name: `pnpm`,
+            version: `10.x`,
+          },
+        },
+        packageManager: `pnpm@6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073`,
+      });
+      await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: `"packageManager" field is set to "pnpm@6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073" which does not match the value defined in "devEngines.packageManager" for "pnpm" of "10.x"\n`,
+        stdout: ``,
+      });
     });
   });
 });

@@ -81,11 +81,17 @@ function parsePackageJSON(packageJSONContent: CorepackPackageJSON, localEnv?: Lo
       if (!semverSatisfies(localEnvVersion, version))
         throw new UsageError(`Local env key ${localEnvKey} defines a value of ${localEnvVersion} which does not match the version defined in package.json devEngines.packageManager of ${version}`);
 
-      debugUtils.log(`Using ${localEnvVersion} defined in .corepack.env`);
+      debugUtils.log(`Using ${localEnvVersion} from the environment as it matches ${version} defined in project manifest`);
       version = localEnvVersion;
     } else {
       const {packageManager: pm} = packageJSONContent;
-      if (pm?.startsWith(`${packageManager.name}@`) && semverSatisfies(pm.slice(packageManager.name.length + 1), version)) {
+      if (pm) {
+        if (!pm.startsWith(`${packageManager.name}@`))
+          throw new UsageError(`"packageManager" field is set to ${JSON.stringify(pm)} which does not match the "devEngines.packageManager" field set to ${JSON.stringify(packageManager.name)}`);
+
+        if (!semverSatisfies(pm.slice(packageManager.name.length + 1), version))
+          throw new UsageError(`"packageManager" field is set to ${JSON.stringify(pm)} which does not match the value defined in "devEngines.packageManager" for ${JSON.stringify(packageManager.name)} of ${JSON.stringify(version)}`);
+
         return pm;
       }
     }
