@@ -75,6 +75,8 @@ function parsePackageJSON(packageJSONContent: CorepackPackageJSON, localEnv?: Lo
     if (!version)
       throw new UsageError(`Providing no version nor ranger for package manager is currently not supported`);
 
+    debugUtils.log(`devEngines defines that ${packageManager.name}@${version} is the local package manager`);
+
     const localEnvKey = `COREPACK_DEV_ENGINES_${packageManager.name.toUpperCase()}`;
     const localEnvVersion = localEnv?.[localEnvKey];
     if (localEnvVersion) {
@@ -107,26 +109,43 @@ export async function setLocalPackageManager(cwd: string, info: PreparedPackageM
   const lookup = await loadSpec(cwd);
 
   const content = lookup.type !== `NoProject`
-    ? await fs.promises.readFile(lookup.target, `utf8`)
+    ? await fs.promises.readFile((lookup as FoundSpecResult).envFilePath ?? lookup.target, `utf8`)
     : ``;
 
-  const {data, indent} = nodeUtils.readPackageJson(content);
+  let previousPackageManager: string;
+  let newContent: string;
+  if ((lookup as FoundSpecResult).envFilePath) {
+    const envKey = `COREPACK_DEV_ENGINES_${(lookup as FoundSpecResult).spec.name.toUpperCase()}`;
+    const index = content.lastIndexOf(`\n${envKey}=`) + 1;
 
-  const previousPackageManager = data.packageManager ?? `unknown`;
-  data.packageManager = `${info.locator.name}@${info.locator.reference}`;
+    if (index === 0 && !content.startsWith(`${envKey}=`))
+      throw new Error(`INTERNAL ASSERTION ERROR: missing expected ${envKey} in .corepack.env`);
 
-  const newContent = nodeUtils.normalizeLineEndings(content, `${JSON.stringify(data, null, indent)}\n`);
-  await fs.promises.writeFile(lookup.target, newContent, `utf8`);
+    const lineEndIndex = content.indexOf(`\n`, index);
+
+    previousPackageManager = content.slice(index, lineEndIndex === -1 ? undefined : lineEndIndex);
+    newContent = nodeUtils.normalizeLineEndings(content, `${content.slice(0, index)}\n${envKey}=${info.locator.reference}\n${lineEndIndex === -1 ? `` : content.slice(lineEndIndex)}`);
+  } else {
+    const {data, indent} = nodeUtils.readPackageJson(content);
+
+    previousPackageManager = data.packageManager ?? `unknown`;
+    data.packageManager = `${info.locator.name}@${info.locator.reference}`;
+
+    newContent = nodeUtils.normalizeLineEndings(content, `${JSON.stringify(data, null, indent)}\n`);
+  }
+
+  await fs.promises.writeFile((lookup as FoundSpecResult).envFilePath ?? lookup.target, newContent, `utf8`);
 
   return {
     previousPackageManager,
   };
 }
 
+type FoundSpecResult = {type: `Found`, target: string, spec: Descriptor, envFilePath?: string};
 export type LoadSpecResult =
     | {type: `NoProject`, target: string}
     | {type: `NoSpec`, target: string}
-    | {type: `Found`, target: string, spec: Descriptor};
+    | FoundSpecResult;
 
 export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
   let nextCwd = initialCwd;
@@ -135,6 +154,7 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
   let selection: {
     data: any;
     manifestPath: string;
+    envFilePath?: string;
     localEnv?: LocalEnvFile;
   } | null = null;
 
@@ -175,7 +195,7 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
       localEnv = process.env;
     }
 
-    selection = {data, manifestPath, localEnv};
+    selection = {data, manifestPath, localEnv, envFilePath};
   }
 
   if (selection === null)
@@ -185,9 +205,12 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
   if (typeof rawPmSpec === `undefined`)
     return {type: `NoSpec`, target: selection.manifestPath};
 
+  debugUtils.log(`${selection.manifestPath} defines ${rawPmSpec} as local package manager`);
+
   return {
     type: `Found`,
     target: selection.manifestPath,
+    envFilePath: selection.localEnv !== process.env ? selection.envFilePath : undefined,
     spec: parseSpec(rawPmSpec, path.relative(initialCwd, selection.manifestPath)),
   };
 }
