@@ -185,17 +185,22 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
       throw new UsageError(`Invalid package.json in ${path.relative(initialCwd, manifestPath)}`);
 
     let localEnv: LocalEnvFile;
-    const envFilePath = path.resolve(currCwd, `./.corepack.env`);
-    debugUtils.log(`Checking ${envFilePath}`);
-    try {
-      localEnv = {...parseEnv(await fs.promises.readFile(envFilePath, `utf8`)), ...process.env};
-      debugUtils.log(`Successfully loaded env file found at ${envFilePath}`);
-    } catch (err) {
-      if ((err as NodeError)?.code !== `ENOENT`)
-        throw err;
-
-      debugUtils.log(`No env file found at ${envFilePath}`);
+    const envFilePath = path.resolve(currCwd, process.env.COREPACK_ENV_FILE ?? `.corepack.env`);
+    if (process.env.COREPACK_ENV_FILE == `0`) {
+      debugUtils.log(`Skipping env file as configured with COREPACK_ENV_FILE`);
       localEnv = process.env;
+    } else {
+      debugUtils.log(`Checking ${envFilePath}`);
+      try {
+        localEnv = {...parseEnv(await fs.promises.readFile(envFilePath, `utf8`)), ...process.env};
+        debugUtils.log(`Successfully loaded env file found at ${envFilePath}`);
+      } catch (err) {
+        if ((err as NodeError)?.code !== `ENOENT`)
+          throw err;
+
+        debugUtils.log(`No env file found at ${envFilePath}`);
+        localEnv = process.env;
+      }
     }
 
     selection = {data, manifestPath, localEnv, envFilePath};
@@ -210,10 +215,16 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
 
   debugUtils.log(`${selection.manifestPath} defines ${rawPmSpec} as local package manager`);
 
+  let envFilePath: string | undefined;
+  if (selection.localEnv !== process.env) {
+    envFilePath = selection.envFilePath;
+    process.env = selection.localEnv;
+  }
+
   return {
     type: `Found`,
     target: selection.manifestPath,
-    envFilePath: selection.localEnv !== process.env ? selection.envFilePath : undefined,
+    envFilePath,
     spec: parseSpec(rawPmSpec, path.relative(initialCwd, selection.manifestPath)),
   };
 }

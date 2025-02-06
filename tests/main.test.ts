@@ -361,6 +361,32 @@ describe(`should accept range in devEngines only if a specific version is provid
       });
     });
   });
+  it(`either in a different env file specified in env`, async() => {
+    await xfs.mktempPromise(async cwd => {
+      await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+        devEngines: {
+          packageManager: {
+            name: `pnpm`,
+            version: `6.x`,
+          },
+        },
+      });
+      await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+        exitCode: 1,
+        stderr: `Invalid package manager specification in package.json (pnpm@6.x); expected a semver version\n`,
+        stdout: ``,
+      });
+
+      await xfs.writeFilePromise(ppath.join(cwd, `.env` as PortablePath),
+        `COREPACK_DEV_ENGINES_PNPM=6.6.2+sha224.eb5c0acad3b0f40ecdaa2db9aa5a73134ad256e17e22d1419a2ab073\n`);
+      process.env.COREPACK_ENV_FILE = `.env`;
+      await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+        exitCode: 0,
+        stderr: ``,
+        stdout: `6.6.2\n`,
+      });
+    });
+  });
   it(`either in an env variable`, async() => {
     await xfs.mktempPromise(async cwd => {
       await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
@@ -415,6 +441,44 @@ describe(`should accept range in devEngines only if a specific version is provid
         stderr: ``,
         stdout: `6.6.2\n`,
       });
+    });
+  });
+});
+
+it(`Should use version from correct source`, async () => {
+  await xfs.mktempPromise(async cwd => {
+    await xfs.writeJsonPromise(ppath.join(cwd, `package.json` as PortablePath), {
+      devEngines: {
+        packageManager: {
+          name: `pnpm`,
+          version: `6.6.2+sha1.11111`,
+        },
+      },
+    });
+    await xfs.writeFilePromise(ppath.join(cwd, `.corepack.env` as PortablePath), `COREPACK_DEV_ENGINES_PNPM=6.6.2+sha1.22222\n`);
+    await xfs.writeFilePromise(ppath.join(cwd, `.other.env` as PortablePath), `COREPACK_DEV_ENGINES_PNPM=6.6.2+sha1.33333\n`);
+
+    // By default, it should pick up .corepack.env
+    await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+      exitCode: 1,
+      stderr: expect.stringContaining(`Mismatch hashes. Expected 22222, got 7b4d6b176c1b93b5670ed94c24babb7d80c13854`),
+      stdout: ``,
+    });
+
+    // When disabling env file, it should pick up the hash inn package.json
+    process.env.COREPACK_ENV_FILE = `0`;
+    await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+      exitCode: 1,
+      stderr: expect.stringContaining(`Mismatch hashes. Expected 11111, got 7b4d6b176c1b93b5670ed94c24babb7d80c13854`),
+      stdout: ``,
+    });
+
+    // When specifying another env file, this one should used
+    process.env.COREPACK_ENV_FILE = `.other.env`;
+    await expect(runCli(cwd, [`pnpm`, `--version`])).resolves.toMatchObject({
+      exitCode: 1,
+      stderr: expect.stringContaining(`Mismatch hashes. Expected 33333, got 7b4d6b176c1b93b5670ed94c24babb7d80c13854`),
+      stdout: ``,
     });
   });
 });
