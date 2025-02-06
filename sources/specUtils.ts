@@ -83,6 +83,11 @@ function parsePackageJSON(packageJSONContent: CorepackPackageJSON, localEnv?: Lo
 
       debugUtils.log(`Using ${localEnvVersion} defined in .corepack.env`);
       version = localEnvVersion;
+    } else {
+      const {packageManager: pm} = packageJSONContent;
+      if (pm?.startsWith(`${packageManager.name}@`) && semverSatisfies(pm.slice(packageManager.name.length + 1), version)) {
+        return pm;
+      }
     }
 
 
@@ -156,11 +161,12 @@ export async function loadSpec(initialCwd: string): Promise<LoadSpecResult> {
     const envFilePath = path.join(currCwd, `.corepack.env`);
     debugUtils.log(`Checking ${envFilePath}`);
     try {
-      localEnv = parseEnv(await fs.promises.readFile(envFilePath, `utf8`)) as LocalEnvFile;
+      localEnv = {...process.env, ...parseEnv(await fs.promises.readFile(envFilePath, `utf8`))};
     } catch (err) {
-      if ((err as NodeError)?.code !== `ENOENT`) {
+      if ((err as NodeError)?.code !== `ENOENT`)
         throw err;
-      }
+
+      localEnv = process.env;
     }
 
     selection = {data, manifestPath, localEnv};

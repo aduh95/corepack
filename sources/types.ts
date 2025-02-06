@@ -146,4 +146,4 @@ export interface Locator {
   reference: string;
 }
 
-export type LocalEnvFile = Record<"COREPACK_ENABLE_AUTO_PIN" | "COREPACK_ENABLE_STRICT" | "COREPACK_INTEGRITY_KEYS" | "COREPACK_PACKAGE_MANAGER", string>;
+export type LocalEnvFile = Record<string, string | undefined>;
