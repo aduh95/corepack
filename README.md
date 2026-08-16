@@ -353,7 +353,7 @@ same major line. Should you need to upgrade to a new major, use an explicit
   - `warn` (case insensitive): attempting to download an unsigned version without
     providing a hash will emit a warning to stderr.
   - `error` (case insensitive): attempting to download an unsigned version without
-    providing a hash will emit a warning to stderr.
+    providing a hash will fail with an error, and nothing gets downloaded.
   - `ignore` (or any other unsupported value): disables that security feature.
 
 - `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` are supported through
